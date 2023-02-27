@@ -24,9 +24,12 @@ const STATE_SEARCH_FAILURE = 'STATE_SEARCH_FAILURE';
 const STATE_SOMETHING_WENT_WRONG = 'STATE_SOMETHING_WENT_WRONG';
 const STATE_ALREADY_HAVE_AN_APPONTMENT = 'STATE_ALREADY_HAVE_AN_APPONTMENT';
 const STATE_USER_ALREADY_HAVE_AN_APPONTMENT = 'STATE_USER_ALREADY_HAVE_AN_APPONTMENT';
+const STATE_DISCLAIMER = 'DISCLAIMER';
 
-
+var toolTipObject = null;
 var allLocations = [];
+var hasAppointment = false;
+var disclaimerAccepted = false;
 
 var curState = STATE_INIT;
 
@@ -398,14 +401,9 @@ async function runSearch() {
 
 async function init() {
     try {
+        runStateMachine(STATE_INIT);
         [allLocations, isLoggedIn, hasAppointment] = await Promise.all([getLocations(), getLoggedInStatus(), checkIfUserHasAppontments()]);
-        if (hasAppointment) {
-            runStateMachine(STATE_USER_ALREADY_HAVE_AN_APPONTMENT);
-        } else if (!isLoggedIn) {
-            runStateMachine(STATE_LOGGED_OUT);
-        } else {
-            runStateMachine(STATE_LOAD_LAST_USER_DATA);
-        }
+        runStateMachine(STATE_DISCLAIMER);
     } catch (err) {
         console.log('unable to init system', err);
         runStateMachine(STATE_INIT_FAILURE);
@@ -601,6 +599,42 @@ function runStateMachine(newState) {
     switch(curState) {
         case STATE_INIT: {
             addChatMessage('טוען נתונים...', false, addDots);
+            break;
+        }
+        case STATE_DISCLAIMER: {
+            const onDisclaimerAccept = () => {
+                disclaimerAccepted = true;
+                if (hasAppointment) {
+                    runStateMachine(STATE_USER_ALREADY_HAVE_AN_APPONTMENT);
+                } else if (!isLoggedIn) {
+                    runStateMachine(STATE_LOGGED_OUT);
+                } else {
+                    runStateMachine(STATE_LOAD_LAST_USER_DATA);
+                }
+            };
+
+            if (disclaimerAccepted) {
+                onDisclaimerAccept();
+                break;
+            }
+
+            addChatMessage('לידיעתכם, השימוש בשרגא הוא בניגוד לתנאי השימוש של האתר ועל אחריותכם בלבד', true, addDots);
+            addChatContent(`
+                    <div class="shraga-chat-buttons-container">
+                        <div class="shraga-primary-button shraga-chat-button" id="shragaAcceptDisclaimer">אני רוצה להמשיך</div>
+                        <div class="shraga-primary-button shraga-chat-button" id="shragaDeclineDisclaimer">אני רוצה לצאת</div>
+                    </div>    
+                `,
+                false,
+                () => {
+                    $('#shragaAcceptDisclaimer').click(() => {
+                        onDisclaimerAccept();
+                    });
+                    $('#shragaDeclineDisclaimer').click(() => {
+                        toolTipObject.close();
+                    });
+                }
+            );
             break;
         }
         case STATE_LOGGED_OUT: {
@@ -1338,7 +1372,7 @@ window.onload = () => {
     container.innerHTML = `<img src=${chrome.runtime.getURL("img/icons/big-icon.png")} width="80%"/>`;
     document.body.appendChild(container);
 
-    const box = new jBox('Modal', {
+    toolTipObject = new jBox('Modal', {
         attach: '#shraga',
         target: '#shraga',
         position: {
@@ -1400,7 +1434,7 @@ window.onload = () => {
     });
 
     if (location.hash.includes('help-me-shraga')) {
-        box.open();
+        toolTipObject.open();
     }
 }
 
