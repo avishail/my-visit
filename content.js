@@ -21,6 +21,9 @@ const STATE_TIME_INPUT = 'STATE_TIME_INPUT';
 const STATE_SEARCHING = 'STATE_SEARCHING';
 const STATE_SEARCH_SUCCESS = 'STATE_SEARCH_SUCCESS';
 const STATE_SEARCH_FAILURE = 'STATE_SEARCH_FAILURE';
+const STATE_SOMETHING_WENT_WRONG = 'STATE_SOMETHING_WENT_WRONG';
+const STATE_ALREADY_HAVE_AN_APPONTMENT = 'STATE_ALREADY_HAVE_AN_APPONTMENT';
+const STATE_USER_ALREADY_HAVE_AN_APPONTMENT = 'STATE_USER_ALREADY_HAVE_AN_APPONTMENT';
 
 
 var allLocations = [];
@@ -265,21 +268,24 @@ async function getRelevantTimeSlots(serviceId, calendarId) {
 
 
 async function getAvailableDates(serviceId) {
-    const today = new Date();
-    const startDate = `${today.getFullYear()}-${pad(today.getMonth()+1, 2)}-${pad(today.getDate(), 2)}`
-    res = await fetch(`https://central.myvisit.com/CentralAPI/SearchAvailableDates?maxResults=365&serviceId=${serviceId}&startDate=${startDate}`, {
-      "headers": {
-        "accept": "application/json, text/plain, */*",
-        "accept-language": "en",
-        "application-api-key": "8640a12d-52a7-4c2a-afe1-4411e00e3ac4",
-        "application-name": "myVisit.com v3.5",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site"
-      },
-      "mode": "cors",
-      "credentials": "include"
-    });
+    var res;
+    try {
+        res = await fetch(`https://central.myvisit.com/CentralAPI/SearchAvailableDates?maxResults=365&serviceId=${serviceId}&startDate=${getTodayDate()}`, {
+        "headers": {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "en",
+            "application-api-key": "8640a12d-52a7-4c2a-afe1-4411e00e3ac4",
+            "application-name": "myVisit.com v3.5",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-site"
+        },
+        "mode": "cors",
+        "credentials": "include"
+        });
+    } catch {
+        return [];
+    }
   
     if (res.status === 401) {
       throw new Error('http error');
@@ -326,8 +332,6 @@ function getRelevantDates(res) {
 
 
 async function runSearchForServiceId(serviceId) {
-    readyServices = await onBoardServices;
-
     const availableDates = await getAvailableDates(serviceId)
     if (!availableDates.length) {
         return false;
@@ -336,10 +340,14 @@ async function runSearchForServiceId(serviceId) {
     for (const availableDate of availableDates) {
         const relevantSlots = await getRelevantTimeSlots(serviceId, availableDate['calendarId']);
         for (const relevantTimeSlot of relevantSlots) {
-            const ok = await setAnAppointment(readyServices.find(s => s["Data"]["ServiceId"] === serviceId), availableDate["calendarDate"], relevantTimeSlot);
-            if (!ok) {
+            const state = await setAnAppointment(onBoardServices.find(s => s["Data"]["ServiceId"] === serviceId), availableDate["calendarDate"], relevantTimeSlot);
+            if (!state) {
                 await new Promise(r => setTimeout(r, 2000));
                 continue;
+            }
+
+            if (state === STATE_ALREADY_HAVE_AN_APPONTMENT) {
+                return STATE_ALREADY_HAVE_AN_APPONTMENT;
             }
                 
             const appDate = availableDate['calendarDate'].split('T')[0];
@@ -354,7 +362,7 @@ async function runSearchForServiceId(serviceId) {
                 time: `${pad(timeDate.getHours(),2)}:${pad(timeDate.getMinutes(),2)}`,
             }
 
-            return true;
+            return STATE_SEARCH_SUCCESS;
         }
     }
 
@@ -363,17 +371,23 @@ async function runSearchForServiceId(serviceId) {
 
 async function runSearch() {
     // let's wait for all services to be onboarded
-    await onBoardServices;
+    try {
+        await onboardSelectedServices();
+    } catch {
+        runStateMachine(STATE_SOMETHING_WENT_WRONG);
+        return;
+    }
+
     try {
         while (true) {
             for (serviceId of serviceIdSelection) {
-                const res = await runSearchForServiceId(serviceId);
-                if (!res) {
+                const state = await runSearchForServiceId(serviceId);
+                if (!state) {
                     await new Promise(r => setTimeout(r, 15000));
                     continue;
                 }
 
-                runStateMachine(STATE_SEARCH_SUCCESS);
+                runStateMachine(state);
                 return;
             }
         }
@@ -384,8 +398,10 @@ async function runSearch() {
 
 async function init() {
     try {
-        [allLocations, isLoggedIn] = await Promise.all([getLocations(), getLoggedInStatus()]);
-        if (!isLoggedIn) {
+        [allLocations, isLoggedIn, hasAppointment] = await Promise.all([getLocations(), getLoggedInStatus(), checkIfUserHasAppontments()]);
+        if (hasAppointment) {
+            runStateMachine(STATE_USER_ALREADY_HAVE_AN_APPONTMENT);
+        } else if (!isLoggedIn) {
             runStateMachine(STATE_LOGGED_OUT);
         } else {
             runStateMachine(STATE_LOAD_LAST_USER_DATA);
@@ -495,78 +511,6 @@ function displayNextChatMessage() {
     );
 }
 
-window.onload = () => {
-    const container = document.createElement('div');
-    container.id="shraga";
-    container.classList.add("shraga");
-    container.classList.add("main-button");
-    container.innerHTML = `<img src=${chrome.runtime.getURL("img/icons/icon.png")} width="50%"/>`;
-    document.body.appendChild(container);
-
-    jQuery(function () {
-        new jBox('Modal', {
-            attach: '#shraga',
-            target: '#shraga',
-            position: {
-                x: 'right',
-                y: 'top'
-            },
-            outside: 'y',
-            pointer: true,
-            offset: {
-                x: -30
-            },
-            closeOnEsc: false,
-            width: 450,
-            height: 500,
-            blockScroll: true,
-            animation: 'zoomIn',
-            closeButton: true,
-            content: `
-                <div class="shraga-container">
-                    <div class="shraga-chat-bottom-space"></div>
-                </div>
-            `,
-            overlay: false,
-            reposition: false,
-            repositionOnOpen: false,
-            onCreated: () => {
-                $('.jBox-container').append(`
-                    <div class="shraga-user-input-container">
-                        <input class="shraga-user-input" placeholder="Write something..."></input>
-                        <img class="shraga-user-input-send" src=${chrome.runtime.getURL("img/icons/send.svg")} />
-                    </div>
-                `);
-
-                hideInput();
-
-                $('.shraga-user-input-send').click(() => {
-                    const inputText = $('.shraga-user-input').val().trim();
-                    if (!inputText) {
-                        return;
-                    }
-                    $('.shraga-user-input').val('');
-                    handleInput(inputText);
-                })
-
-                $('.shraga-user-input').keypress(function(event){
-                    const keycode = (event.keyCode ? event.keyCode : event.which);
-                    const inputText = $('.shraga-user-input').val().trim();
-                    if (keycode === 13 && inputText) {
-                        event.preventDefault();
-                        $('.shraga-user-input').val('');
-                        handleInput(inputText);
-                    }
-                });
-
-                windowWasOpened = true;
-                addChatMessage('אהלן! אני שרגא ואני אעזור לכם למצוא תור פנוי בהקדם', false);
-                runStateMachine();
-            },
-          });
-    });
-}
-
 function initServiceTypeSelection(id) {
     new lc_select(`#${id}`, {
         wrap_width: '100%',
@@ -575,7 +519,6 @@ function initServiceTypeSelection(id) {
         autofocus_search: true,
         addit_classes: ['lcslt-rtl'],
         on_change: (selections) => {
-            console.log(selections);
             $('#acceptServiceButton').removeClass('disabled');
             serviceTypeSelection = selections[0];
         },
@@ -598,7 +541,6 @@ function initLocationSelection(id) {
             } else {
                 $('#acceptLocationsButton').removeClass('disabled');
             }
-            console.log(selections);
             serviceIdSelection = selections.map(id => Number(id));
         },
     });
@@ -617,7 +559,6 @@ function initMonthSelection(id) {
                 $('#acceptMonthsButton').removeClass('disabled');
             }
             monthSelection = selections;
-            console.log(selections);
         },
     });
 }
@@ -630,7 +571,6 @@ function initTimeSelection(id) {
         addit_classes: ['lcslt-rtl'],
         on_change: (selections) => {
             timeSelection = selections;
-            console.log(selections);
         },
     });
 }
@@ -719,7 +659,7 @@ function runStateMachine(newState) {
                     () => {
                         $('#loadPersonalDataButton').click(() => {
                             userId = result["last-user-id"];
-                            userPhone = result["last-user-id"];
+                            userPhone = result["last-user-phone"];
                             runStateMachine(STATE_LOAD_LAST_SEARCH_DATA);
                         });
                         $('#declinePersonalDataButton').click(() => {
@@ -804,8 +744,6 @@ function runStateMachine(newState) {
                             timeSelection = result["last-time-selection"];
                             monthSelection = result["last-month-selection"];
 
-                            onBoardServices = onboardSelectedServices();
-
                             runStateMachine(STATE_SEARCHING);
                         });
                         $('#declineSearchDataButton').click(() => {
@@ -817,8 +755,7 @@ function runStateMachine(newState) {
             break;
         }
         case STATE_ID_INPUT: {
-            addChatMessage('מה מספר תעודת הזהות שלכם?', true);
-            showInput();
+            addChatMessage('מה מספר תעודת הזהות שלכם?', true, showInput);
             break;
         }
         case STATE_ID_INPUT_VALIDATION: {
@@ -889,7 +826,7 @@ function runStateMachine(newState) {
         case STATE_LOCATION_INPUT: {
             const id = `locationSelect_${uiIdCounter++}`;
             
-            addChatMessage('לאילו לשכות תרצו להגיע? ניתן לבחור יותר מלשכה אחת וסדר הבחירה ישפיע על סדר החיפוש', false);
+            addChatMessage('לאילו לשכות תרצו להגיע? ניתן לבחור יותר מלשכה אחת.', false);
             
             options = '';
             for (const loc of allLocations) {
@@ -920,8 +857,6 @@ function runStateMachine(newState) {
                         $('#acceptLocationsButton').off('click');
                         document.querySelector(`#w${id}`).addEventListener('click', (e) => e.stopPropagation(), true);
                         
-                        onBoardServices = onboardSelectedServices();
-
                         runStateMachine(STATE_MONTH_INPUT);
                     });
                 }
@@ -930,7 +865,7 @@ function runStateMachine(newState) {
         }
         case STATE_MONTH_INPUT: {
             const id = `monthSelect_${uiIdCounter++}`;
-            addChatMessage('באילו חודשים תרצו לקבוע את התור? ניתן לבחור יותר מחודש אחד וסדר הבחירה ישפיע על סדר החיפוש', false);
+            addChatMessage('באילו חודשים תרצו לקבוע את התור? ניתן לבחור יותר מאפשרות אחת.', false);
             
             options = `
                 <option value="w1">בשבוע הקרוב</option>
@@ -978,7 +913,7 @@ function runStateMachine(newState) {
         }
         case STATE_TIME_INPUT: {
             const id = `timeSelect_${uiIdCounter++}`;
-            addChatMessage('באילו שעות תרצו להגיע? עבור כל שעות היום אין צורך לבחור. ניתן לבחור יותר מטווח שעות אחד וסדר הבחירה ישפיע על סדר החיפוש', false);
+            addChatMessage('באילו שעות תרצו להגיע? עבור כל שעות היום אין צורך לבחור. ניתן לבחור יותר מטווח שעות אחד.', false);
             
             minutesFromMidnight = (hour) => {
                 return hour * 60;
@@ -1026,6 +961,7 @@ function runStateMachine(newState) {
             const successSoundId = `successSound${uiIdCounter++}`;
             const failureSoundId = `failureSound${uiIdCounter++}`
             addChatMessage('מתחיל לחפש', false);
+            
             addChatMessage(`
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
                     כשהחיפוש יסתיים ישמע צליל של
@@ -1061,7 +997,6 @@ function runStateMachine(newState) {
                         window.open("https://myvisit.com/#!/home/signin/", "_blank");
                     });
                     $('#shragaContinueSearchButton').click(() => {
-                        onBoardServices = onboardSelectedServices();
                         runStateMachine(STATE_SEARCHING);
                     });
                     $('#shragaNewSearchButton').click(() => {
@@ -1105,17 +1040,48 @@ function runStateMachine(newState) {
                         window.open('https://myvisit.com/#!/home/provider/56', '_blank');
                     });
                     $('#shragaNewSearchButton').click(() => {
-                        runStateMachine(STATE_LOAD_PERSONAL_DATA);
+                        runStateMachine(STATE_LOAD_LAST_USER_DATA);
                     });
                 }
             );
+            break;
+        }
+        case STATE_SOMETHING_WENT_WRONG: {
+            playSound('failure.mp3');
+            addChatMessage('אופס... משהו השתבש', false);
+            addChatMessage('נסו לרענן את הדף ולנסות שוב', false);
+            break;
+        }
+        case STATE_ALREADY_HAVE_AN_APPONTMENT: {
+            playSound('failure.mp3');
+            addChatMessage('כבר קיים תור על תעודת הזהות שלכם', false);
+            addChatMessage('אנא בטלו את התור ונסו שוב', false);
+            break;
+        }
+        case STATE_USER_ALREADY_HAVE_AN_APPONTMENT: {
+            addChatMessage('כבר קיים תור על תעודת הזהות שלכם', false);
+            addChatMessage('אנא בטלו את התור ונסו שוב', false);
+            addChatContent(`
+                    <div class="shraga-chat-buttons-container">
+                        <div class="shraga-primary-button shraga-chat-button" id="shragaMyAppointmentsButton">התורים שלי</div>'
+                        <div class="shraga-primary-button shraga-chat-button" id="shragaTryAgain">נסו שוב</div>'
+                    </div>
+                `,
+                false,
+                () => {
+                    $('#shragaMyAppointmentsButton').click(() => {
+                        location.href = 'https://myvisit.com/#!/home/myvisits/';
+                    });
+                    $('#shragaTryAgain').click(() => {
+                        void init();
+                        runStateMachine(STATE_INIT);
+                    });
+                }
+            );
+            break;
         }
     }
 }    
-
-console.log('Im alive');
-void init();
-
 
 async function prepareVisit() {
     const res = await fetch("https://central.myvisit.com/CentralAPI/Organization/56/PrepareVisit", {
@@ -1249,9 +1215,6 @@ async function sendServiceService(prepareServiceVisit) {
             "application-name": "myVisit.com v3.5",
             "content-type": "application/json;charset=UTF-8",
             "preparedvisittoken": "36fc3dd3-3525-493a-9e88-b0eb3d7f760f",
-            "sec-ch-ua": "\"Not_A Brand\";v=\"99\", \"Google Chrome\";v=\"109\", \"Chromium\";v=\"109\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"macOS\"",
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-site"
@@ -1271,6 +1234,44 @@ async function sendServiceService(prepareServiceVisit) {
         });
     const json = await res.json();
     return json;
+}
+
+function getTodayDate() {
+    const d = Date.parse(new Date())
+    const   date_obj = new Date(d)
+    return `${date_obj.getFullYear()}-${date_obj.toLocaleString("default", { month: "2-digit" })}-${date_obj.toLocaleString("default", { day: "2-digit"})}`
+}
+
+async function checkIfUserHasAppontments() {
+    const res = await fetch(`https://central.myvisit.com/CentralAPI/User/Visits/?$orderby=ReferenceDate%20desc&$filter=ReferenceDate%20ge%20${getTodayDate()}&position=`, {
+        "headers": {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "en",
+            "application-api-key": "8640a12d-52a7-4c2a-afe1-4411e00e3ac4",
+            "application-name": "myVisit.com v3.5",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-site"
+        },
+        "referrer": "https://myvisit.com/",
+        "referrerPolicy": "no-referrer-when-downgrade",
+        "body": null,
+        "method": "GET",
+        "mode": "cors",
+        "credentials": "include"
+    });
+    const json = await res.json();
+    if (!json["Data"]) {
+        return false;
+    }
+
+    for (appointment of json["Data"]) {
+        if (appointment["CurrentEntityStatus"] === 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 async function setAnAppointment(serviceService, appDate, appTime) {
@@ -1298,7 +1299,15 @@ async function setAnAppointment(serviceService, appDate, appTime) {
     });
 
     const json = await res.json();
-    return json["Success"];
+    if (json["Success"]) {
+        return STATE_SEARCH_SUCCESS;
+    }
+
+    if ((json["Messages"]?.[0] || '').includes('המערכת זיהתה תור קיים לתעודת הזהות שהקשת')) {
+        return STATE_ALREADY_HAVE_AN_APPONTMENT;
+    }
+
+    return false;
 }
 
 async function onboardService(serviceId) {
@@ -1312,10 +1321,87 @@ async function onboardService(serviceId) {
 }
 
 async function onboardSelectedServices() {
-    work = []
+    onBoardServices = []
+    // one by one so the service won't block us
     for (serviceId of serviceIdSelection) {
-        work.push(onboardService(serviceId)); 
+        service = await onboardService(serviceId);
+        onBoardServices.push(service);
     }
-
-    return await Promise.all(work);
+    return;
 }
+
+window.onload = () => {
+    const container = document.createElement('div');
+    container.id="shraga";
+    container.classList.add("shraga");
+    container.classList.add("main-button");
+    container.innerHTML = `<img src=${chrome.runtime.getURL("img/icons/big-icon.png")} width="80%"/>`;
+    document.body.appendChild(container);
+
+    const box = new jBox('Modal', {
+        attach: '#shraga',
+        target: '#shraga',
+        position: {
+            x: 'right',
+            y: 'top'
+        },
+        outside: 'y',
+        pointer: true,
+        offset: {
+            x: -40
+        },
+        closeOnEsc: false,
+        width: 450,
+        height: 500,
+        blockScroll: true,
+        animation: 'zoomIn',
+        closeButton: true,
+        content: `
+            <div class="shraga-container">
+                <div class="shraga-chat-bottom-space"></div>
+            </div>
+        `,
+        overlay: false,
+        reposition: false,
+        repositionOnOpen: false,
+        onCreated: () => {
+            $('.jBox-container').append(`
+                <div class="shraga-user-input-container">
+                    <input class="shraga-user-input" placeholder="Write something..."></input>
+                    <img class="shraga-user-input-send" src=${chrome.runtime.getURL("img/icons/send.svg")} />
+                </div>
+            `);
+
+            hideInput();
+
+            $('.shraga-user-input-send').click(() => {
+                const inputText = $('.shraga-user-input').val().trim();
+                if (!inputText) {
+                    return;
+                }
+                $('.shraga-user-input').val('');
+                handleInput(inputText);
+            })
+
+            $('.shraga-user-input').keypress(function(event){
+                const keycode = (event.keyCode ? event.keyCode : event.which);
+                const inputText = $('.shraga-user-input').val().trim();
+                if (keycode === 13 && inputText) {
+                    event.preventDefault();
+                    $('.shraga-user-input').val('');
+                    handleInput(inputText);
+                }
+            });
+
+            windowWasOpened = true;
+            addChatMessage('אהלן! אני שרגא ואני אעזור לכם למצוא תור פנוי בהקדם', false);
+            runStateMachine();
+        },
+    });
+
+    if (location.hash.includes('help-me-shraga')) {
+        box.open();
+    }
+}
+
+void init();

@@ -2,5 +2,5 @@
 
 rm ~/Downloads/extension.zip
 
-zip -r ~/Downloads/extension.zip * -x package.sh
+zip -r ~/Downloads/extension.zip * -x package.sh README.md LICENSE
 

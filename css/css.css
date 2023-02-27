@@ -1,18 +1,7 @@
-/* latin */
-@font-face {
-    font-family: 'Pragati Narrow';
-    font-style: normal;
-    font-weight: 400;
-    /*src: url('chrome-extension://__MSG_@@extension_id__/font/pragatinarrow.woff2') format('woff');*/
-    src: url('../font/pragatinarrow.woff2') format('woff');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
 @font-face {
     font-family: 'Varela Round';
     font-style: normal;
     font-weight: 400;
-    /*src: url('chrome-extension://__MSG_@@extension_id__/font/VarelaRound-Regular.ttf') format('ttf');*/
     src: url('../font/VarelaRound-Regular.ttf') format('ttf');
 }
 
@@ -21,7 +10,7 @@
     font-family: 'Roboto';
     font-style: normal;
     font-weight: 400;
-    src: url(https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxKKTU1Kg.woff2) format('woff2');
+    src: url('../font/Roboto.woff2') format('woff2');
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -36,11 +25,10 @@
     right: 100px;
     width: 80px;
     height: 80px;
-    background-color: #FFFFFFFF;
-    box-shadow: 0 0 50px #aaa;
+    background-color: #a7dff1;
+    box-shadow: 0 0 20px #555555;
     border-radius: 50%;
     z-index: 100;
-    direction: rtl;
 }
 
 .shraga-container {
