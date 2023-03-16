@@ -23,7 +23,7 @@ You give Shraga some information about where and when you want to schedule the a
 
 1. Download the extension from [this link](https://github.com/avishail/my-visit/raw/main/extension.zip)
 2. Extract it to a folder
-3. On Chrome, open chrome://extensions/)
+3. On Chrome, open chrome://extensions/
 4. Toggle Developer mode on the upper right corner
 5. Click on **Load unpacked** button and select the folder you extracted the extension to during step #2
 6. Go to myvisit.com and **Shraga** will be there to assist you
