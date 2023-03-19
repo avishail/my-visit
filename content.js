@@ -228,7 +228,8 @@ function playSound(soundToPlay) {
     return audio.play(); 
 }
 
-async function getRelevantTimeSlots(serviceId, calendarId) {
+async function getRelevantTimeSlots(serviceId, calendarInfo) {
+    const calendarId = calendarInfo['calendarId']
     res = await fetch(`https://central.myvisit.com/CentralAPI/SearchAvailableSlots?CalendarId=${calendarId}&ServiceId=${serviceId}&dayPart=0`, {
       "headers": {
         "accept": "application/json, text/plain, */*",
@@ -242,18 +243,31 @@ async function getRelevantTimeSlots(serviceId, calendarId) {
       "mode": "cors",
       "credentials": "include"
     });
-    
-    if (!res.ok) {
-        runStateMachine(STATE_SEARCH_FAILURE);
+
+    if (res.status === 401) {
         throw new Error('http error');
     }
     
+    if (!res.ok) {
+        return;
+    }
+    
     const json = await res.json();
-    if (!json['TotalResults']) {
+    if (!json["Success"] || !json['TotalResults']) {
         return;
     }
 
-    return json['Results'].filter(slot => {
+    const now = new Date();
+    const isToday = now.toDateString() === new Date(calendarInfo['calendarDate']).toDateString();
+
+    const slots = json['Results'].filter(slot => {
+        // if the slot is today and less than 60 minutes from now, skip it.
+        if (isToday) {
+            const minutesFromMidnight = now.getHours() * 60 + now.getMinutes();
+            if (slot['Time'] - minutesFromMidnight < 60) {
+                return false;
+            }
+        }
         if (!timeSelection.length) {
             return true;
         }
@@ -266,7 +280,18 @@ async function getRelevantTimeSlots(serviceId, calendarId) {
                 return true;
             }
         }
-    }).map(slot => slot['Time']);
+    })
+    .map(slot => slot['Time']);
+    
+    if (isToday) {
+        // since it takes time to get to the appointment, if the free slot is today
+        // prefer the latest available slot
+        slots.reverse();
+    }
+
+    return slots;
+    
+    .reverse();
 }
 
 
@@ -299,6 +324,10 @@ async function getAvailableDates(serviceId) {
     }
   
     const json = await res.json();
+
+    if (!json["Success"]) {
+        return [];
+    }
     
     return (json['Results'] || []).filter(r => {
         const appDate = r['calendarDate'].split('T')[0];
@@ -341,7 +370,7 @@ async function runSearchForServiceId(serviceId) {
     }
 
     for (const availableDate of availableDates) {
-        const relevantSlots = await getRelevantTimeSlots(serviceId, availableDate['calendarId']);
+        const relevantSlots = await getRelevantTimeSlots(serviceId, availableDate);
         for (const relevantTimeSlot of relevantSlots) {
             const state = await setAnAppointment(onBoardServices.find(s => s["Data"]["ServiceId"] === serviceId), availableDate["calendarDate"], relevantTimeSlot);
             if (!state) {
@@ -1312,8 +1341,6 @@ async function setAnAppointment(serviceService, appDate, appTime) {
     const preparedVisitId = serviceService["Data"]["PreparedVisitId"];
     const serviceId = serviceService["Data"]["ServiceId"];
     const preparedVisitToken = serviceService["Data"]["PreparedVisitToken"];
-
-
     const res = await fetch(`https://central.myvisit.com/CentralAPI/AppointmentSet?ServiceId=${serviceId}&appointmentDate=${appDate}&appointmentTime=${appTime}&preparedVisitId=${preparedVisitId}&position=%7B%22lat%22:%2232.0837%22,%22lng%22:%2234.8282%22,%22accuracy%22:1440%7D`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
@@ -1331,6 +1358,14 @@ async function setAnAppointment(serviceService, appDate, appTime) {
         "mode": "cors",
         "credentials": "include"
     });
+
+    if (res.status === 401) {
+        throw new Error('http error');
+    }
+
+    if (!res.ok) {
+        return false;
+    }
 
     const json = await res.json();
     if (json["Success"]) {
