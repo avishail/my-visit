@@ -295,8 +295,6 @@ async function getRelevantTimeSlots(serviceId, calendarInfo) {
     }
 
     return slots;
-    
-    .reverse();
 }
 
 
