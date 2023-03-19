@@ -26,6 +26,8 @@ const STATE_ALREADY_HAVE_AN_APPONTMENT = 'STATE_ALREADY_HAVE_AN_APPONTMENT';
 const STATE_USER_ALREADY_HAVE_AN_APPONTMENT = 'STATE_USER_ALREADY_HAVE_AN_APPONTMENT';
 const STATE_DISCLAIMER = 'DISCLAIMER';
 
+const MIN_MINUTES_FROM_TODAYS_SLOT = 90;
+
 var toolTipObject = null;
 var allLocations = [];
 var hasAppointment = false;
@@ -261,10 +263,13 @@ async function getRelevantTimeSlots(serviceId, calendarInfo) {
     const isToday = now.toDateString() === new Date(calendarInfo['calendarDate']).toDateString();
 
     const slots = json['Results'].filter(slot => {
-        // if the slot is today and less than 60 minutes from now, skip it.
+        // if the slot is today and less than 90 minutes from now, skip it since
+        // the user might not have enough time to get there and they won't be able
+        // to cancel it either due to the restriction of can't cancel an hour before
+        // the appointment
         if (isToday) {
             const minutesFromMidnight = now.getHours() * 60 + now.getMinutes();
-            if (slot['Time'] - minutesFromMidnight < 60) {
+            if (slot['Time'] - minutesFromMidnight < MIN_MINUTES_FROM_TODAYS_SLOT) {
                 return false;
             }
         }
