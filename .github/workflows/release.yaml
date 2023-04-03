@@ -1,0 +1,47 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+      - name: "Bump"
+        id: bump
+        run: |
+          echo "Curren version: $(jq .version manifest.json)"
+
+          pip install -r src/requirements.txt
+          python src/releases_version_bump.py
+
+          echo "NEW_VERSION=$(jq -r .version manifest.json)" >> $GITHUB_OUTPUT
+
+      - name: "Pack"
+        run: |
+          src/package.sh
+        env:
+          VERSION: "${{ steps.bump.outputs.NEW_VERSION }}"
+
+      - name: "Release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          files: shraga_v${{ env.VERSION }}.zip
+        env:
+          VERSION: "${{ steps.bump.outputs.NEW_VERSION }}"
+
+      - name: "Commit"
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "[Release] v${{ env.VERSION }}"
+        env:
+          VERSION: "${{ steps.bump.outputs.NEW_VERSION }}"
