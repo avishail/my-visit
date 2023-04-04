@@ -1,8 +1,8 @@
 {
   "name": "Shraga",
   "description": "Shraga will help you to book a myvisit appointments",
-  "version": "1.0.0",
-  "version_name": "1.0.0",
+  "version": "1.0.1",
+  "version_name": "1.0.1",
   "manifest_version": 3,
   "action": {
     "default_popup": "popup.html",
@@ -15,26 +15,37 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["img/icons/*.*", "font/*.woff2", "css/*.css", "sound/*.*"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "img/icons/*.*",
+        "font/*.woff2",
+        "css/*.css",
+        "sound/*.*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "content_scripts": [
     {
-      "matches": [ "https://myvisit.com/*" ],
+      "matches": [
+        "https://myvisit.com/*"
+      ],
       "js": [
         "js/jquery-3.6.0.min.js",
         "js/multi-select.min.js",
         "js/jBox.all.min.js",
         "js/lc_select.js",
         "content.js"
-       ],
-       "css": [
-         "css/lc_select.css",
-         "css/css.css",
-         "css/jBox.all.min.css"
-       ]
+      ],
+      "css": [
+        "css/lc_select.css",
+        "css/css.css",
+        "css/jBox.all.min.css"
+      ]
     }
   ]
 }
