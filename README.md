@@ -21,7 +21,7 @@ You give Shraga some information about where and when you want to schedule the a
 
 ## How to install?
 
-1. Download the extension from [this link](https://github.com/avishail/my-visit/raw/main/extension.zip)
+1. Download the extension from the [Releases page](https://github.com/avishail/my-visit/releases)
 2. Extract it to a folder
 3. On Chrome, open chrome://extensions/
 4. Toggle Developer mode on the upper right corner
