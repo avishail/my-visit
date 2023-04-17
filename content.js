@@ -28,6 +28,9 @@ const STATE_DISCLAIMER = 'DISCLAIMER';
 
 const MIN_MINUTES_FROM_TODAYS_SLOT = 90;
 
+var apiHost = window.location.host === 'piba.myvisit.com'
+    ? 'piba-api.myvisit.com' : 'central.myvisit.com';
+
 var toolTipObject = null;
 var allLocations = [];
 var hasAppointment = false;
@@ -130,7 +133,7 @@ function showInput() {
 }
 
 async function getServiceTypeId() {
-    const res = await fetch("https://central.myvisit.com/CentralAPI/GetServiceTypeList?organizationId=56", {
+    const res = await fetch(`https://${apiHost}/CentralAPI/GetServiceTypeList?organizationId=56`, {
         "headers": {
           "accept": "application/json, text/plain, */*",
           "accept-language": "en",
@@ -153,7 +156,7 @@ async function getServiceTypeId() {
 }
 
 async function getOrgId() {
-    const res = await fetch("https://central.myvisit.com/CentralAPI/ProviderSearch?CategoryId=0&CountryId=1&ResultsInPage=20&SearchPhrase=&ViewMode=0&currentPage=1&mostPopular=true&src=mvws", {
+    const res = await fetch(`https://${apiHost}/CentralAPI/ProviderSearch?CategoryId=0&CountryId=1&ResultsInPage=20&SearchPhrase=&ViewMode=0&currentPage=1&mostPopular=true&src=mvws`, {
         "headers": {
           "accept": "application/json, text/plain, */*",
           "accept-language": "en",
@@ -176,7 +179,7 @@ async function getOrgId() {
 }
 
 async function getLoggedInStatus() {
-    res = await fetch("https://central.myvisit.com/CentralAPI/Organization/56/PrepareVisit", {
+    res = await fetch(`https://${apiHost}/CentralAPI/Organization/56/PrepareVisit`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -195,7 +198,7 @@ async function getLoggedInStatus() {
 }
 
 async function getLocations() {
-    res = await fetch(`https://central.myvisit.com/CentralAPI/LocationSearch?organizationId=56&resultsInPage=100&serviceTypeId=156`, {
+    res = await fetch(`https://${apiHost}/CentralAPI/LocationSearch?organizationId=56&resultsInPage=100&serviceTypeId=156`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -232,7 +235,7 @@ function playSound(soundToPlay) {
 
 async function getRelevantTimeSlots(serviceId, calendarInfo) {
     const calendarId = calendarInfo['calendarId']
-    res = await fetch(`https://central.myvisit.com/CentralAPI/SearchAvailableSlots?CalendarId=${calendarId}&ServiceId=${serviceId}&dayPart=0`, {
+    res = await fetch(`https://${apiHost}/CentralAPI/SearchAvailableSlots?CalendarId=${calendarId}&ServiceId=${serviceId}&dayPart=0`, {
       "headers": {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en",
@@ -301,7 +304,7 @@ async function getRelevantTimeSlots(serviceId, calendarInfo) {
 async function getAvailableDates(serviceId) {
     var res;
     try {
-        res = await fetch(`https://central.myvisit.com/CentralAPI/SearchAvailableDates?maxResults=365&serviceId=${serviceId}&startDate=${getTodayDate()}`, {
+        res = await fetch(`https://${apiHost}/CentralAPI/SearchAvailableDates?maxResults=365&serviceId=${serviceId}&startDate=${getTodayDate()}`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -1150,7 +1153,7 @@ function runStateMachine(newState) {
 }    
 
 async function prepareVisit() {
-    const res = await fetch("https://central.myvisit.com/CentralAPI/Organization/56/PrepareVisit", {
+    const res = await fetch(`https://${apiHost}/CentralAPI/Organization/56/PrepareVisit`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -1174,7 +1177,7 @@ async function prepareVisit() {
 
 async function sendUserId(initialPrepare) {
     const preparedVisitToken = initialPrepare["Data"]["PreparedVisitToken"];
-    const res = await fetch(`https://central.myvisit.com/CentralAPI/PreparedVisit/${preparedVisitToken}/Answer`, {
+    const res = await fetch(`https://${apiHost}/CentralAPI/PreparedVisit/${preparedVisitToken}/Answer`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -1208,7 +1211,7 @@ async function sendUserId(initialPrepare) {
 }
 
 async function sendUserPhone(userIdAnswer) {
-    const res = await fetch(`https://central.myvisit.com/CentralAPI/PreparedVisit/${userIdAnswer["Data"]["PreparedVisitToken"]}/Answer`, {
+    const res = await fetch(`https://${apiHost}/CentralAPI/PreparedVisit/${userIdAnswer["Data"]["PreparedVisitToken"]}/Answer`, {
         "headers": {
           "accept": "application/json, text/plain, */*",
           "accept-language": "en",
@@ -1239,7 +1242,7 @@ async function sendUserPhone(userIdAnswer) {
 
 async function prepareServiceVisit(serviceId, userPhoneAnswer) {
     const preparedvisittoken  = userPhoneAnswer["Data"]["PreparedVisitToken"];
-    const res = await fetch(`https://central.myvisit.com/CentralAPI/Service/${serviceId}/PrepareVisit`, {
+    const res = await fetch(`https://${apiHost}/CentralAPI/Service/${serviceId}/PrepareVisit`, {
         "headers": {
           "accept": "application/json, text/plain, */*",
           "accept-language": "en",
@@ -1273,7 +1276,7 @@ async function sendServiceService(prepareServiceVisit) {
         answer = answers[randomIndex];
     }
 
-    const res = await fetch(`https://central.myvisit.com/CentralAPI/PreparedVisit/${preparedVisitToken}/Answer`, {
+    const res = await fetch(`https://${apiHost}/CentralAPI/PreparedVisit/${preparedVisitToken}/Answer`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -1309,7 +1312,7 @@ function getTodayDate() {
 }
 
 async function checkIfUserHasAppontments() {
-    const res = await fetch(`https://central.myvisit.com/CentralAPI/User/Visits/?$orderby=ReferenceDate%20desc&$filter=ReferenceDate%20ge%20${getTodayDate()}&position=`, {
+    const res = await fetch(`https://${apiHost}/CentralAPI/User/Visits/?$orderby=ReferenceDate%20desc&$filter=ReferenceDate%20ge%20${getTodayDate()}&position=`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
@@ -1344,7 +1347,7 @@ async function setAnAppointment(serviceService, appDate, appTime) {
     const preparedVisitId = serviceService["Data"]["PreparedVisitId"];
     const serviceId = serviceService["Data"]["ServiceId"];
     const preparedVisitToken = serviceService["Data"]["PreparedVisitToken"];
-    const res = await fetch(`https://central.myvisit.com/CentralAPI/AppointmentSet?ServiceId=${serviceId}&appointmentDate=${appDate}&appointmentTime=${appTime}&preparedVisitId=${preparedVisitId}&position=%7B%22lat%22:%2232.0837%22,%22lng%22:%2234.8282%22,%22accuracy%22:1440%7D`, {
+    const res = await fetch(`https://${apiHost}/CentralAPI/AppointmentSet?ServiceId=${serviceId}&appointmentDate=${appDate}&appointmentTime=${appTime}&preparedVisitId=${preparedVisitId}&position=%7B%22lat%22:%2232.0837%22,%22lng%22:%2234.8282%22,%22accuracy%22:1440%7D`, {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en",
